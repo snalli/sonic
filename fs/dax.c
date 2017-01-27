@@ -1468,4 +1468,97 @@ int iomap_dax_fault(struct vm_area_struct *vma, struct vm_fault *vmf,
 	return VM_FAULT_NOPAGE | major;
 }
 EXPORT_SYMBOL_GPL(iomap_dax_fault);
+
+struct vm_struct
+*dax_do_remap(struct kiocb *iocb, get_block_t get_block)
+{
+        struct vm_struct *vm = 0;
+/*
+        struct address_space *mapping = iocb->ki_filp->f_mapping;
+        struct inode *inode = mapping->host;
+
+        unsigned long size = inode->i_size;
+        loff_t offset = 0, length = size, map_len = 0;
+        sector_t blkno;
+        struct block_device *bdev = inode->i_sb->s_bdev;
+        unsigned int blkbits = inode->i_blkbits;
+
+        unsigned long first_block, max_blocks;
+        bool new, boundary;
+        u32 bno;
+        int ret = 0;
+	phys_addr_t phys_addr = 0;
+	void *vm_addr = 0;
+	pgprot_t prot = PAGE_KERNEL_IO;
+
+        trace_printk("blkbits = %u\n", blkbits);
+	prot = __pgprot(pgprot_val(prot) |
+			cachemode2protval(_PAGE_CACHE_MODE_WB));
+        vm = get_vm_area(size, VM_IOREMAP);
+        if(!vm) {
+                trace_printk("cannot alloc vm\n");
+                return 0;
+        }
+	vm_addr = vm->addr;
+
+        while(length)
+        {
+		struct blk_dax_ctl dax = { 0 };
+                first_block = offset >> blkbits;
+                max_blocks = (length + (1 << blkbits) - 1) >> blkbits;
+                new = false, boundary = false;
+
+                // ret is the number of blocks mapped
+		// get_block is a wrapper on get_blocks 
+                ret = get_blocks(inode, first_block, max_blocks,
+                                &bno, &new, &boundary, 0);
+                if (ret <= 0) {
+                       trace_printk("/ release vm area /\n");
+                       goto fail;
+		}
+                // blk to sector 
+                // logical -> virtual -> physical 
+                // It is becoming easier to write code 
+                // bno is the page no, blkno is the sector no.
+                // we have to convert page no to physical addr
+                // and the length of the mapping is given by map_len
+                map_len = (u64)ret << blkbits;
+                blkno = (sector_t)bno << (blkbits - 9);
+		dax.sector = blkno;
+		dax.size = map_len;
+		ret = dax_map_atomic(bdev, &dax);
+                if (ret < 0) {
+                        goto fail;
+                }
+		phys_addr = pfn_t_to_phys(dax.pfn); 
+
+		ret = ioremap_page_range((unsigned long) vm_addr, 
+			(unsigned long)vm_addr + map_len, phys_addr, prot);
+		if(ret < 0) {
+			trace_printk("ioremap page range failed\n");
+			goto fail;
+		}
+		// if (!memremap(phys_addr, map_len, MEMREMAP_WB))
+		//	goto fail;
+                dax_unmap_atomic(bdev, &dax);
+                // convert sector addr to dax virt/phy addr
+		trace_printk("freud : vm_addr=%p, ret=%d\n", vm_addr, ret);
+                trace_printk("freud : offset=%lld, map_len=%lld\n", offset, map_len);
+                trace_printk("freud : blkno=%lu, virt_addr=%p, phys_addr=%p\n",  blkno, dax.addr, (void*)phys_addr);
+
+                offset += map_len;
+                length -= map_len;
+		vm_addr += map_len;
+        }
+	return vm;
+*/
+fail:
+	vm = remove_vm_area(vm->addr);
+	if(vm)
+        	kzfree(vm);
+        vm = 0;
+        return vm;
+}
+EXPORT_SYMBOL_GPL(dax_do_remap);
+
 #endif /* CONFIG_FS_IOMAP */

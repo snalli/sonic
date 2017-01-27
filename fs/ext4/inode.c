@@ -3537,7 +3537,9 @@ out:
 static ssize_t ext4_direct_IO_read(struct kiocb *iocb, struct iov_iter *iter)
 {
 	struct address_space *mapping = iocb->ki_filp->f_mapping;
+	struct file *filp = iocb->ki_filp;
 	struct inode *inode = mapping->host;
+	struct vm_struct *vm = 0;
 	ssize_t ret;
 
 	/*
@@ -3547,6 +3549,52 @@ static ssize_t ext4_direct_IO_read(struct kiocb *iocb, struct iov_iter *iter)
 	 */
 	inode_lock_shared(inode);
 	if (IS_DAX(inode)) {
+		/*
+		 * Get down to the dax layer with templates for VFS structures.
+		 * The last arg for dax_do_io is the flags where you can
+		 * request O_MAP.  This may race with a file write if it also
+		 * uses the pre-map so guard it with a lock, and when you
+		 * acquire the lock, re-check before initiating the pre-map.
+		 * vfs_read : acquire a read lock. check for o_map. If file is
+		 * pre-mapped, read from there else release the read lock and
+		 * pass the flag down to fs.
+		 * fs_read : check for o_map flag. initiate
+		 * the pre-map if requested, after acquiring a write lock.
+		 * finish the pre-map and read. if fail, fall back on default
+		 * read. release the write lock on fail.
+		 *
+		 * Here is where you branch of into the dax layer giving
+		 * it the file system routine that maps file offsets to blocks.
+		 * Do the same but on dax_map routine that decides whether to
+		 * do a regular io or pre-mapped io. on a successful pre-map,
+		 * copy_to_iter at the vfs layer.
+		 */
+		if(filp->f_flags & O_MAP) 
+		{
+			/* 
+			 * grab a write-lock on the pre-map once you grab the
+			 * lock, check to see if another writer has already
+			 * established the pre-map. this can be written better,
+			 * but not worth my time.
+			 */
+			if(!mapping->dax_remap_vm) 
+			{
+				vm = dax_do_remap(iocb, ext4_dio_get_block);
+				/* attach vm to file address_space */
+				if(vm) {
+					mapping->dax_remap_vm = vm;
+					/* release the write-lock on the pre-map */
+					ret = 0; // What does this return value mean ? check.
+					goto out_unlock;
+				}
+			}
+			/* 
+			 * we couldn't pre-map.  release the write-lock on the
+			 * pre-map and fall through to default io.
+			 * 				
+			 */
+		}
+
 		ret = dax_do_io(iocb, inode, iter, ext4_dio_get_block, NULL, 0);
 	} else {
 		size_t count = iov_iter_count(iter);

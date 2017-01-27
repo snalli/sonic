@@ -4,6 +4,7 @@
 #include <linux/fs.h>
 #include <linux/mm.h>
 #include <linux/radix-tree.h>
+#include <linux/vmalloc.h>
 #include <asm/pgtable.h>
 
 struct iomap_ops;
@@ -23,6 +24,7 @@ int dax_fault(struct vm_area_struct *, struct vm_fault *, get_block_t);
 int dax_delete_mapping_entry(struct address_space *mapping, pgoff_t index);
 void dax_wake_mapping_entry_waiter(struct address_space *mapping,
 				   pgoff_t index, bool wake_all);
+struct vm_struct *dax_do_remap(struct kiocb *iocb, get_block_t get_block);
 
 #ifdef CONFIG_FS_DAX
 struct page *read_dax_sector(struct block_device *bdev, sector_t n);

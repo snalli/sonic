@@ -446,6 +446,8 @@ struct address_space {
 	gfp_t			gfp_mask;	/* implicit gfp mask for allocations */
 	struct list_head	private_list;	/* ditto */
 	void			*private_data;	/* ditto */
+	struct vm_struct	*dax_remap_vm;  /* file premap addr */
+	spinlock_t		remap_lock;	/* and its lock. change to rw lock */
 } __attribute__((aligned(sizeof(long))));
 	/*
 	 * On most architectures that alignment is already the case; but
