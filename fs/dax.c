@@ -32,6 +32,7 @@
 #include <linux/pfn_t.h>
 #include <linux/sizes.h>
 #include <linux/iomap.h>
+#include <linux/vmalloc.h>
 #include "internal.h"
 
 /*
@@ -166,8 +167,11 @@ static ssize_t dax_io(struct inode *inode, struct iov_iter *iter,
 	while (pos < end) {
 		size_t len;
 		if (pos == max) {
+			/* logical page nr */
 			long page = pos >> PAGE_SHIFT;
+			/* logical sector nr */
 			sector_t block = page << (PAGE_SHIFT - blkbits);
+			/* byte off in the sector */
 			unsigned first = pos - (block << blkbits);
 			long size;
 
@@ -223,8 +227,10 @@ static ssize_t dax_io(struct inode *inode, struct iov_iter *iter,
 		} else if (!hole)
 			len = copy_to_iter((void __force *) dax.addr, max - pos,
 					iter);
-		else
+		else {
+			// reads from a hole return zero
 			len = iov_iter_zero(max - pos, iter);
+		}
 
 		if (!len) {
 			rc = -EFAULT;
