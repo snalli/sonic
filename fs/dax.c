@@ -167,11 +167,11 @@ static ssize_t dax_io(struct inode *inode, struct iov_iter *iter,
 	while (pos < end) {
 		size_t len;
 		if (pos == max) {
-			/* logical page nr */
+			/* logical page nr the pos maps to */
 			long page = pos >> PAGE_SHIFT;
-			/* logical sector nr */
+			/* logical sector nr wehre the page begins */
 			sector_t block = page << (PAGE_SHIFT - blkbits);
-			/* byte off in the sector */
+			/* byte off in the page */
 			unsigned first = pos - (block << blkbits);
 			long size;
 
@@ -199,6 +199,11 @@ static ssize_t dax_io(struct inode *inode, struct iov_iter *iter,
 				bh->b_size -= done;
 			}
 
+			/*
+			 * logical file off_t --> fs off_t --> physical device off_t
+			 * The last one is a virtual addr which is converted to physical
+			 * addr via page tables.
+			 */
 			hole = rw == READ && !buffer_written(bh);
 			if (hole) {
 				size = bh->b_size - first;
@@ -1479,23 +1484,21 @@ struct vm_struct
 *dax_do_remap(struct kiocb *iocb, get_block_t get_block)
 {
         struct vm_struct *vm = 0;
-/*
         struct address_space *mapping = iocb->ki_filp->f_mapping;
         struct inode *inode = mapping->host;
 
         unsigned long size = inode->i_size;
-        loff_t offset = 0, length = size, map_len = 0;
-        sector_t blkno;
+        loff_t offset = 0, length = size, map_len = 0, end = size;
         struct block_device *bdev = inode->i_sb->s_bdev;
         unsigned int blkbits = inode->i_blkbits;
 
-        unsigned long first_block, max_blocks;
-        bool new, boundary;
-        u32 bno;
+        unsigned long first_block;
         int ret = 0;
 	phys_addr_t phys_addr = 0;
 	void *vm_addr = 0;
 	pgprot_t prot = PAGE_KERNEL_IO;
+
+	struct buffer_head bh;
 
         trace_printk("blkbits = %u\n", blkbits);
 	prot = __pgprot(pgprot_val(prot) |
@@ -1509,17 +1512,22 @@ struct vm_struct
 
         while(length)
         {
-		struct blk_dax_ctl dax = { 0 };
+		struct blk_dax_ctl dax = { .addr = ERR_PTR(-EIO), };
                 first_block = offset >> blkbits;
-                max_blocks = (length + (1 << blkbits) - 1) >> blkbits;
-                new = false, boundary = false;
+
+		memset(&bh, 0, sizeof(bh));
+		bh.b_size = PAGE_ALIGN(end - offset);
+		bh.b_state = 0;
+		bh.b_bdev = bdev;
 
                 // ret is the number of blocks mapped
 		// get_block is a wrapper on get_blocks 
-                ret = get_blocks(inode, first_block, max_blocks,
-                                &bno, &new, &boundary, 0);
-                if (ret <= 0) {
-                       trace_printk("/ release vm area /\n");
+                //ret = get_blocks(inode, first_block, max_blocks,
+                //                &bno, &new, &boundary, 0);
+                // take care of bh_max;
+		ret = get_block(inode, first_block, &bh, 0);
+                if (ret) {
+                       trace_printk("block mapping failed \n");
                        goto fail;
 		}
                 // blk to sector 
@@ -1528,10 +1536,10 @@ struct vm_struct
                 // bno is the page no, blkno is the sector no.
                 // we have to convert page no to physical addr
                 // and the length of the mapping is given by map_len
-                map_len = (u64)ret << blkbits;
-                blkno = (sector_t)bno << (blkbits - 9);
-		dax.sector = blkno;
+                map_len = (u64)bh.b_size;
+		dax.sector = to_sector(&bh, inode);
 		dax.size = map_len;
+
 		ret = dax_map_atomic(bdev, &dax);
                 if (ret < 0) {
                         goto fail;
@@ -1544,20 +1552,13 @@ struct vm_struct
 			trace_printk("ioremap page range failed\n");
 			goto fail;
 		}
-		// if (!memremap(phys_addr, map_len, MEMREMAP_WB))
-		//	goto fail;
                 dax_unmap_atomic(bdev, &dax);
-                // convert sector addr to dax virt/phy addr
-		trace_printk("freud : vm_addr=%p, ret=%d\n", vm_addr, ret);
-                trace_printk("freud : offset=%lld, map_len=%lld\n", offset, map_len);
-                trace_printk("freud : blkno=%lu, virt_addr=%p, phys_addr=%p\n",  blkno, dax.addr, (void*)phys_addr);
 
                 offset += map_len;
                 length -= map_len;
 		vm_addr += map_len;
         }
 	return vm;
-*/
 fail:
 	vm = remove_vm_area(vm->addr);
 	if(vm)
