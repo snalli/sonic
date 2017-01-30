@@ -460,6 +460,8 @@ EXPORT_SYMBOL(__vfs_read);
 ssize_t vfs_read(struct file *file, char __user *buf, size_t count, loff_t *pos)
 {
 	ssize_t ret;
+	struct address_space *mapping = file->f_mapping;
+	struct inode *inode = mapping->host;
 
 	if (!(file->f_mode & FMODE_READ))
 		return -EBADF;
@@ -472,11 +474,33 @@ ssize_t vfs_read(struct file *file, char __user *buf, size_t count, loff_t *pos)
 	if (!ret) {
 		if (count > MAX_RW_COUNT)
 			count =  MAX_RW_COUNT;
-		ret = __vfs_read(file, buf, count, pos);
-		if (ret > 0) {
-			fsnotify_access(file);
-			add_rchar(current, ret);
+		
+		if(IS_DAX(inode) && (file->f_flags & O_MAP) &&
+					mapping->dax_remap_vm) {
+			if(!count) {
+				ret = 0;
+				goto out;
+			}
+			/* 
+			 * do we need filemap write and wait range here ?
+			 * may be, because we do not want lingering data
+			 * from volatile caches. There could be redundant flushes. 
+			 * for code clarity, if the pre-map is null
+			 * just read on the __vfs_read path.
+			 */
+			file_accessed(file);	
+			inode_lock_shared(inode);
+			/* return the number of bytes read */
+			inode_unlock_shared(inode);
+		} else {
+
+			ret = __vfs_read(file, buf, count, pos);
+			if (ret > 0) {
+				fsnotify_access(file);
+				add_rchar(current, ret);
+			}
 		}
+out:
 		inc_syscr(current);
 	}
 
