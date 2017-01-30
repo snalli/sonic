@@ -18,6 +18,7 @@
 #include <linux/compat.h>
 #include <linux/mount.h>
 #include <linux/fs.h>
+#include <linux/vmalloc.h>
 #include "internal.h"
 
 #include <asm/uaccess.h>
@@ -462,6 +463,8 @@ ssize_t vfs_read(struct file *file, char __user *buf, size_t count, loff_t *pos)
 	ssize_t ret;
 	struct address_space *mapping = file->f_mapping;
 	struct inode *inode = mapping->host;
+	loff_t ppos = *pos;
+	void *to = 0, *from = 0;
 
 	if (!(file->f_mode & FMODE_READ))
 		return -EBADF;
@@ -491,16 +494,21 @@ ssize_t vfs_read(struct file *file, char __user *buf, size_t count, loff_t *pos)
 			file_accessed(file);	
 			inode_lock_shared(inode);
 			/* return the number of bytes read */
+			from = mapping->dax_remap_vm->addr + ppos;
+			to = buf;
+			ret = copy_to_user(to, buf, count);
+			ppos += ret;
+			*pos = ppos;
 			inode_unlock_shared(inode);
 		} else {
 
 			ret = __vfs_read(file, buf, count, pos);
-			if (ret > 0) {
-				fsnotify_access(file);
-				add_rchar(current, ret);
-			}
 		}
 out:
+		if (ret > 0) {
+			fsnotify_access(file);
+			add_rchar(current, ret);
+		}
 		inc_syscr(current);
 	}
 

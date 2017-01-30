@@ -3541,6 +3541,10 @@ static ssize_t ext4_direct_IO_read(struct kiocb *iocb, struct iov_iter *iter)
 	struct inode *inode = mapping->host;
 	struct vm_struct *vm = 0;
 	ssize_t ret;
+	void *from = 0;
+	loff_t offset = iocb->ki_pos;
+	size_t bytes = iov_iter_count(iter);
+	struct iov_iter *to = iter;
 
 	/*
 	 * Shared inode_lock is enough for us - it protects against concurrent
@@ -3581,20 +3585,17 @@ static ssize_t ext4_direct_IO_read(struct kiocb *iocb, struct iov_iter *iter)
 			{
 				vm = dax_do_remap(iocb, ext4_dio_get_block);
 				/* attach vm to file address_space */
-				if(vm) {
+				if(vm) 
 					mapping->dax_remap_vm = vm;
-					/* release the write-lock on the pre-map */
-					ret = 0; // What does this return value mean ? check.
-					goto out_unlock;
-				}
+				else
+					goto slow_path;
 			}
-			/* 
-			 * we couldn't pre-map.  release the write-lock on the
-			 * pre-map and fall through to default io.
-			 * 				
-			 */
+		
+			from = mapping->dax_remap_vm->addr + offset;
+			ret = copy_to_iter(from, bytes, to);
+			goto out_unlock;
 		}
-
+slow_path:
 		ret = dax_do_io(iocb, inode, iter, ext4_dio_get_block, NULL, 0);
 	} else {
 		size_t count = iov_iter_count(iter);
