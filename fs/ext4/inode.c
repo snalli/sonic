@@ -3590,7 +3590,7 @@ static ssize_t ext4_direct_IO_read(struct kiocb *iocb, struct iov_iter *iter)
 				else
 					goto slow_path;
 			}
-		
+			trace_printk("reading from premap in ext4_direct_IO\n");
 			from = mapping->dax_remap_vm->addr + offset;
 			ret = copy_to_iter(from, bytes, to);
 			goto out_unlock;
