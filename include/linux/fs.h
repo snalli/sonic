@@ -431,6 +431,7 @@ int pagecache_write_end(struct file *, struct address_space *mapping,
 struct address_space {
 	struct inode		*host;		/* owner: inode, block_device */
 	struct radix_tree_root	page_tree;	/* radix tree of all pages */
+	struct vm_struct	*dax_remap_vm;  /* file premap addr */
 	spinlock_t		tree_lock;	/* and lock protecting it */
 	atomic_t		i_mmap_writable;/* count VM_SHARED mappings */
 	struct rb_root		i_mmap;		/* tree of private and shared mappings */
@@ -446,8 +447,7 @@ struct address_space {
 	gfp_t			gfp_mask;	/* implicit gfp mask for allocations */
 	struct list_head	private_list;	/* ditto */
 	void			*private_data;	/* ditto */
-	struct vm_struct	*dax_remap_vm;  /* file premap addr */
-	spinlock_t		remap_lock;	/* and its lock. change to rw lock */
+	//spinlock_t		remap_lock;	/* and its lock. change to rw lock */
 } __attribute__((aligned(sizeof(long))));
 	/*
 	 * On most architectures that alignment is already the case; but

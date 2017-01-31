@@ -436,11 +436,30 @@ static ssize_t new_sync_read(struct file *filp, char __user *buf, size_t len, lo
 	struct iov_iter iter;
 	ssize_t ret;
 
+	struct address_space *mapping = filp->f_mapping;
+	struct inode *inode = mapping->host;
+	void *to = &iter, *from = 0;
+
 	init_sync_kiocb(&kiocb, filp);
 	kiocb.ki_pos = *ppos;
 	iov_iter_init(&iter, READ, &iov, 1, len);
 
-	ret = filp->f_op->read_iter(&kiocb, &iter);
+	if(IS_DAX(inode) && (filp->f_flags & O_MAP) &&
+				mapping->dax_remap_vm) {
+
+		file_accessed(filp);	
+
+		inode_lock_shared(inode);
+		from = mapping->dax_remap_vm->addr + kiocb.ki_pos;
+                ret = copy_to_iter(from, len, to);
+		trace_printk("bytes copied : %ld\n", ret);
+		kiocb.ki_pos += ret;
+		inode_unlock_shared(inode);
+
+	} else {
+		ret = filp->f_op->read_iter(&kiocb, &iter);
+	}
+
 	BUG_ON(ret == -EIOCBQUEUED);
 	*ppos = kiocb.ki_pos;
 	return ret;
@@ -461,10 +480,6 @@ EXPORT_SYMBOL(__vfs_read);
 ssize_t vfs_read(struct file *file, char __user *buf, size_t count, loff_t *pos)
 {
 	ssize_t ret;
-	struct address_space *mapping = file->f_mapping;
-	struct inode *inode = mapping->host;
-	loff_t ppos = *pos;
-	void *to = 0, *from = 0;
 
 	if (!(file->f_mode & FMODE_READ))
 		return -EBADF;
@@ -477,34 +492,8 @@ ssize_t vfs_read(struct file *file, char __user *buf, size_t count, loff_t *pos)
 	if (!ret) {
 		if (count > MAX_RW_COUNT)
 			count =  MAX_RW_COUNT;
-		
-		if(IS_DAX(inode) && (file->f_flags & O_MAP) &&
-					mapping->dax_remap_vm) {
-			if(!count) {
-				ret = 0;
-				goto out;
-			}
-			/* 
-			 * do we need filemap write and wait range here ?
-			 * may be, because we do not want lingering data
-			 * from volatile caches. There could be redundant flushes. 
-			 * for code clarity, if the pre-map is null
-			 * just read on the __vfs_read path.
-			 */
-			file_accessed(file);	
-			inode_lock_shared(inode);
-			/* return the number of bytes read */
-			from = mapping->dax_remap_vm->addr + ppos;
-			to = buf;
-			ret = copy_to_user(to, buf, count);
-			ppos += ret;
-			*pos = ppos;
-			inode_unlock_shared(inode);
-		} else {
 
-			ret = __vfs_read(file, buf, count, pos);
-		}
-out:
+		ret = __vfs_read(file, buf, count, pos);
 		if (ret > 0) {
 			fsnotify_access(file);
 			add_rchar(current, ret);
