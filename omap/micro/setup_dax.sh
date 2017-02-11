@@ -25,10 +25,10 @@ mount -o dax /dev/pmem0 /mnt/dax
 
 echo "** creating large file"
 largefile=/mnt/dax/largefile
-dd if=/dev/zero of=/mnt/dax/largefile bs=1M count=2330
-dd if=/dev/zero of=/mnt/dax/largefile bs=1M count=2330
-dd if=/dev/zero of=/mnt/dax/largefile bs=1M count=2330
-filefrag $largefile
+dd if=/dev/zero of=$largefile bs=1M count=2330
+dd if=/dev/zero of=$largefile bs=1M count=2330
+dd if=/dev/zero of=$largefile bs=1M count=2330
+printf "**"; filefrag $largefile
 
 echo "** drop caches"
 sync;sync;sync
