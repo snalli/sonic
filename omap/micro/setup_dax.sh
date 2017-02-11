@@ -20,13 +20,15 @@ umount /mnt/dax
 mkfs.ext4 -F /dev/pmem0
 mount -o dax /dev/pmem0 /mnt/dax
 
-echo "** fragmenting dax"
-./chopper/src/puncher /mnt/dax/puncher  ./chopper/src/puncher.conf 0
+#echo "** fragmenting dax"
+#./chopper/src/puncher /mnt/dax/puncher  ./chopper/src/puncher.conf 0
 
 echo "** creating large file"
+largefile=/mnt/dax/largefile
 dd if=/dev/zero of=/mnt/dax/largefile bs=1M count=2330
 dd if=/dev/zero of=/mnt/dax/largefile bs=1M count=2330
 dd if=/dev/zero of=/mnt/dax/largefile bs=1M count=2330
+filefrag $largefile
 
 echo "** drop caches"
 sync;sync;sync
