@@ -452,7 +452,7 @@ static ssize_t new_sync_read(struct file *filp, char __user *buf, size_t len, lo
 		inode_lock_shared(inode);
 		from = mapping->dax_remap_vm->addr + kiocb.ki_pos;
                 ret = copy_to_iter(from, len, to);
-		trace_printk("bytes copied : %ld\n", ret);
+		/*trace_printk("bytes copied : %ld\n", ret);*/
 		kiocb.ki_pos += ret;
 		inode_unlock_shared(inode);
 
