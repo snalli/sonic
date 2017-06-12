@@ -98,10 +98,12 @@ ext4_file_write_iter(struct kiocb *iocb, struct iov_iter *from)
 	ssize_t ret;
 
 	inode_lock(inode);
+	/* freud : check 1, nothing, ignore for dax */
 	ret = generic_write_checks(iocb, from);
 	if (ret <= 0)
 		goto out;
 
+	/* freud : check 2, not aio for dax, ignore for dax */
 	/*
 	 * Unaligned direct AIO must be serialized among each other as zeroing
 	 * of partial blocks of two competing unaligned AIOs can result in data
@@ -114,6 +116,7 @@ ext4_file_write_iter(struct kiocb *iocb, struct iov_iter *from)
 		ext4_unwritten_wait(inode);
 	}
 
+	/* freud : check 3, unlikely but don't care, ignore for dax */
 	/*
 	 * If we have encountered a bitmap-format file, the size limit
 	 * is smaller than s_maxbytes, which is for extent-mapped files.
@@ -128,6 +131,7 @@ ext4_file_write_iter(struct kiocb *iocb, struct iov_iter *from)
 		iov_iter_truncate(from, sbi->s_bitmap_maxbytes - iocb->ki_pos);
 	}
 
+	/* freud : check 4, ignore for dax but comeback later due to o_direct */
 	iocb->private = &overwrite;
 	if (o_direct) {
 		size_t length = iov_iter_count(from);
@@ -161,7 +165,7 @@ ext4_file_write_iter(struct kiocb *iocb, struct iov_iter *from)
 				overwrite = 1;
 		}
 	}
-
+	/* freud : end of line */
 	ret = __generic_file_write_iter(iocb, from);
 	inode_unlock(inode);
 

@@ -451,8 +451,13 @@ static ssize_t new_sync_read(struct file *filp, char __user *buf, size_t len, lo
 
 		inode_lock_shared(inode);
 		from = mapping->dax_remap_vm->addr + kiocb.ki_pos;
-                ret = copy_to_iter(from, len, to);
-		/*trace_printk("bytes copied : %ld\n", ret);*/
+		/* 
+		 * look for uncacheable variant to avoid cache pollution 
+		 * when there is low re-use
+		 */
+                // ret = copy_to_iter(from, len, to);
+		ret = len - __copy_to_user(buf, from, len);
+		trace_printk("off = %llu, bytes copied = %ld\n", *ppos, ret);
 		kiocb.ki_pos += ret;
 		inode_unlock_shared(inode);
 
@@ -513,11 +518,37 @@ static ssize_t new_sync_write(struct file *filp, const char __user *buf, size_t 
 	struct iov_iter iter;
 	ssize_t ret;
 
+	struct address_space *mapping = filp->f_mapping;
+	struct inode *inode = mapping->host;
+	void *from = &iter, *to = 0;
+
 	init_sync_kiocb(&kiocb, filp);
 	kiocb.ki_pos = *ppos;
 	iov_iter_init(&iter, WRITE, &iov, 1, len);
 
-	ret = filp->f_op->write_iter(&kiocb, &iter);
+	if(IS_DAX(inode) && (filp->f_flags & O_MAP) &&
+				mapping->dax_remap_vm) {
+
+		file_accessed(filp);	
+		// take care if time update
+		inode_lock(inode);
+		ret = generic_write_checks(&kiocb, from);
+	        if (ret > 0) 
+		{
+			ret = file_remove_privs(filp);
+		        if (!ret) 
+			{
+				to = mapping->dax_remap_vm->addr + kiocb.ki_pos;
+        	        	// ret = copy_from_iter_nocache(to, len, from);
+				ret = len - __copy_from_user_inatomic_nocache(to, buf, len);
+				trace_printk("off = %llu, bytes copied = %ld\n", *ppos, ret);
+				kiocb.ki_pos += ret;
+			}
+		}
+		inode_unlock(inode);
+	} else {
+		ret = filp->f_op->write_iter(&kiocb, &iter);
+	}
 	BUG_ON(ret == -EIOCBQUEUED);
 	if (ret > 0)
 		*ppos = kiocb.ki_pos;
@@ -888,7 +919,7 @@ static ssize_t do_readv_writev(int type, struct file *file,
 		iter_fn = file->f_op->write_iter;
 		file_start_write(file);
 	}
-
+	/* freud : put the dax map here, just before you call iter */
 	if (iter_fn)
 		ret = do_iter_readv_writev(file, &iter, pos, iter_fn, flags);
 	else

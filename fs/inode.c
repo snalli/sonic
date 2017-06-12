@@ -349,10 +349,13 @@ void address_space_init_once(struct address_space *mapping)
 	memset(mapping, 0, sizeof(*mapping));
 	INIT_RADIX_TREE(&mapping->page_tree, GFP_ATOMIC | __GFP_ACCOUNT);
 	spin_lock_init(&mapping->tree_lock);
+	spin_lock_init(&mapping->dax_remap_lock);
 	init_rwsem(&mapping->i_mmap_rwsem);
 	INIT_LIST_HEAD(&mapping->private_list);
 	spin_lock_init(&mapping->private_lock);
 	mapping->i_mmap = RB_ROOT;
+	mapping->dax_remap_vm = 0;
+	mapping->dax_remap_tried = 0;
 }
 EXPORT_SYMBOL(address_space_init_once);
 

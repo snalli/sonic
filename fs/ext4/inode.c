@@ -3374,12 +3374,22 @@ static ssize_t ext4_direct_IO_write(struct kiocb *iocb, struct iov_iter *iter)
 	ssize_t ret;
 	loff_t offset = iocb->ki_pos;
 	size_t count = iov_iter_count(iter);
+
+	struct file *filp = file;
+	struct address_space *mapping = filp->f_mapping;
+	struct vm_struct *vm = 0;
+	void *to = 0;
+        size_t bytes = count;
+        struct iov_iter *from = iter;
+
 	int overwrite = 0;
 	get_block_t *get_block_func = NULL;
 	int dio_flags = 0;
 	loff_t final_size = offset + count;
 	int orphan = 0;
 	handle_t *handle;
+
+
 
 	if (final_size > inode->i_size) {
 		/* Credits for sb + inode write */
@@ -3463,6 +3473,33 @@ static ssize_t ext4_direct_IO_write(struct kiocb *iocb, struct iov_iter *iter)
 	BUG_ON(ext4_encrypted_inode(inode) && S_ISREG(inode->i_mode));
 #endif
 	if (IS_DAX(inode)) {
+		// insert the map here
+		
+		if(filp->f_flags & O_MAP) 
+		{
+			spin_lock(&mapping->dax_remap_lock);
+			if(!mapping->dax_remap_vm) 
+			{
+				if(!mapping->dax_remap_tried)
+					vm = dax_do_remap(iocb, ext4_dio_get_block);
+
+				/* attach vm to file address_space */
+				if(vm)
+					mapping->dax_remap_vm = vm;
+				else {
+					mapping->dax_remap_tried = 1;
+					spin_unlock(&mapping->dax_remap_lock);
+					goto ind_write;
+				}
+			}
+			spin_unlock(&mapping->dax_remap_lock);
+
+			trace_printk("reading from premap in ext4_direct_IO\n");
+			to = mapping->dax_remap_vm->addr + offset;
+			ret = copy_from_iter_nocache(to, bytes, from);
+			goto write_out;
+		}
+ind_write:
 		ret = dax_do_io(iocb, inode, iter, get_block_func,
 				ext4_end_io_dio, dio_flags);
 	} else
@@ -3470,7 +3507,7 @@ static ssize_t ext4_direct_IO_write(struct kiocb *iocb, struct iov_iter *iter)
 					   inode->i_sb->s_bdev, iter,
 					   get_block_func,
 					   ext4_end_io_dio, NULL, dio_flags);
-
+write_out:
 	if (ret > 0 && !overwrite && ext4_test_inode_state(inode,
 						EXT4_STATE_DIO_UNWRITTEN)) {
 		int err;
@@ -3580,22 +3617,42 @@ static ssize_t ext4_direct_IO_read(struct kiocb *iocb, struct iov_iter *iter)
 			 * lock, check to see if another writer has already
 			 * established the pre-map. this can be written better,
 			 * but not worth my time.
+			 *
+			 * Need an exclusive for the pre-mapping phase to prevent
+			 * concurrent readers from simultaneously performing it.
+			 * Only readers race with each other for this op, but a
+			 * writer will never race with other writers or readers
+			 * as it exclusively grabs the top-level inode lock.
 			 */
+			spin_lock(&mapping->dax_remap_lock);
 			if(!mapping->dax_remap_vm) 
 			{
-				vm = dax_do_remap(iocb, ext4_dio_get_block);
+				if(!mapping->dax_remap_tried)
+					vm = dax_do_remap(iocb, ext4_dio_get_block);
+
 				/* attach vm to file address_space */
-				if(vm) 
+				if(vm)
 					mapping->dax_remap_vm = vm;
-				else
-					goto slow_path;
+				else {
+					/*
+					 * if a reader fails, prevent another
+					 * reader from re-trying unnecessarily.
+					 * if successful, the other reader will
+					 * know it from the value of dax_remap_vm.
+					 */
+					mapping->dax_remap_tried = 1;
+					spin_unlock(&mapping->dax_remap_lock);
+					goto ind_read;
+				}
 			}
+			spin_unlock(&mapping->dax_remap_lock);
+
 			trace_printk("reading from premap in ext4_direct_IO\n");
 			from = mapping->dax_remap_vm->addr + offset;
 			ret = copy_to_iter(from, bytes, to);
 			goto out_unlock;
 		}
-slow_path:
+ind_read:
 		ret = dax_do_io(iocb, inode, iter, ext4_dio_get_block, NULL, 0);
 	} else {
 		size_t count = iov_iter_count(iter);

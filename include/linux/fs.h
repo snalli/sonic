@@ -433,6 +433,8 @@ struct address_space {
 	struct radix_tree_root	page_tree;	/* radix tree of all pages */
 	struct vm_struct	*dax_remap_vm;  /* file premap addr */
 	spinlock_t		tree_lock;	/* and lock protecting it */
+	spinlock_t		dax_remap_lock;
+	int 			dax_remap_tried;
 	atomic_t		i_mmap_writable;/* count VM_SHARED mappings */
 	struct rb_root		i_mmap;		/* tree of private and shared mappings */
 	struct rw_semaphore	i_mmap_rwsem;	/* protect tree, count, list */
