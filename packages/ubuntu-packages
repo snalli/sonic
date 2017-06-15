@@ -8,4 +8,6 @@ sudo apt install git
 sudo apt install libncurses5-dev libncursesw5-dev
 sudo apt install libssl-dev
 sudo apt install libmpich-dev libopenmpi-dev
-
+sudo apt install m4
+sudo apt install bison
+sudo apt install automake
