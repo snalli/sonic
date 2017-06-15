@@ -34,7 +34,7 @@ int main(int argc, char **argv)
 	struct timeval start, stop;
 	struct timezone tz;
 
-	sprintf(pid, "%lu\n", getpid());	
+	sprintf(pid, "%d\n", getpid());	
 	printf("pid   = %s", pid);	
 
 	/*
@@ -61,23 +61,23 @@ int main(int argc, char **argv)
 				WRITE = true;
 				break;
 			default: /* '?' */
-				fprintf(stderr, "Usage: %s [-m <NONE>] [-i iter	<%llu>] 	\
-						[-b size (kilobytes) <%llu>] [-w write/read]	\
+				fprintf(stderr, "Usage: %s [-m <NONE>] [-i iter	<%d>] 	\
+						[-b size (kilobytes) <%d>] [-w write/read]	\
 					\n", argv[0], iter_max, block_max);
 				exit(EXIT_FAILURE);
                }
 	}
 
 	printf("type  = %s\n", OP_MSG);
-	printf("block = %llu kilobytes\n", block);
-	printf("iter  = %llu (times %lu)\n", iter_count, COUNT);
+	printf("block = %lu kilobytes\n", block);
+	printf("iter  = %llu (times %d)\n", iter_count, COUNT);
 	printf("O_MAP = %s\n", ((flags & O_MAP) ? "yes" : "no"));
 	block *= 1024;	/* convert to bytes */
 
 	buf = (char*) malloc(block);
 	if(!buf) {
 		ret = -6;
-		printf("malloc(%llu) failed.\n", block);
+		printf("malloc(%lu) failed.\n", block);
 		goto done;
 	}
 
