@@ -27,12 +27,13 @@ set $dir=/tmp
 set $dir=/mnt/dax
 set $filesize=5g
 set $filesize=2g
+set $filesize=24g
 
 set $iosize=4k
-# set $iosize=64k
+#set $iosize=64k
 # set $iosize=256k
 
-set $nthreads=1
+set $nthreads=8
 set $workingset=0
 set $directio=0
 set $omap=0
@@ -47,6 +48,7 @@ define process name=rand-read,instances=1
     flowop read name=rand-read2,filename=largefile1,iosize=$iosize,random,workingset=$workingset,directio=$omap
     flowop read name=rand-read3,filename=largefile1,iosize=$iosize,random,workingset=$workingset,directio=$omap
     flowop read name=rand-read4,filename=largefile1,iosize=$iosize,random,workingset=$workingset,directio=$omap
+    flowop read name=rand-read5,filename=largefile1,iosize=$iosize,random,workingset=$workingset,directio=$omap
     flowop write name=rand-write1,filename=largefile1,iosize=$iosize,random,workingset=$workingset,directio=$omap
 
   }
@@ -54,4 +56,4 @@ define process name=rand-read,instances=1
 
 echo "Random Read Version 3.0 personality successfully loaded"
 
-run 60
+run 300

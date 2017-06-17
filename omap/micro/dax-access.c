@@ -94,7 +94,7 @@ int main(int argc, char **argv)
 		goto done;
 	}
 	stat(dax_file, &st);
-	size = st.st_size;
+	size = st.st_size;	/* bytes */
 	iter = 0;
 	
 	printf("fsize = %0.2lf gigabytes\n", 
@@ -114,7 +114,9 @@ int main(int argc, char **argv)
 		 */
 		while(n_rdwr < COUNT) 
 		{
-			lseek64(dax_fd, random()%(size/block), SEEK_SET);
+			ret = lseek64(dax_fd, block*(random()%(size/block)), SEEK_SET);
+			if(ret == -1)
+				goto close;
 			if(WRITE)
 				bytes = write(dax_fd, buf, block);
 			else
@@ -132,8 +134,9 @@ int main(int argc, char **argv)
 				((stop.tv_sec*1000000 + stop.tv_usec) -
 				 (start.tv_sec*1000000 + start.tv_usec))/
 				1000000);
-		printf("===============================================\n");
 	}
+close:
+	printf("===============================================\n");
 	close(dax_fd);
 done:
 	return ret;

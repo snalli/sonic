@@ -1,8 +1,8 @@
 #!/bin/bash
 
 echo "** switching off tracing"
-echo 0 > /debug/tracing/tracing_on
-echo nop > /debug/tracing/current_tracer
+echo 0 > /sys/kernel/debug/tracing/tracing_on
+echo nop > /sys/kernel/debug/tracing/current_tracer
 
 # echo "** switching off all but one cpus"
 # echo 0 > /sys/devices/system/cpu/cpu1/online 
@@ -23,13 +23,11 @@ mount -o dax /dev/pmem0 /mnt/dax
 #echo "** fragmenting dax"
 ./chopper/src/src/puncher /mnt/dax/puncher  ./chopper/src/src/puncher.conf 0
 
-echo "** creating large file"
-largefile=/mnt/dax/largefile
-block=4096
-count=6291456
-dd if=/dev/zero of=$largefile bs=$block count=$count
-# dd if=/dev/zero of=$largefile bs=1M count=2330
-# dd if=/dev/zero of=$largefile bs=1M count=2330
+# echo "** creating large file"
+# largefile=/mnt/dax/largefile
+# block=4096
+# count=6291456
+# dd if=/dev/zero of=$largefile bs=$block count=$count
 # printf "**"; filefrag $largefile
 
 echo "** drop caches"
