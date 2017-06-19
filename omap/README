@@ -1,0 +1,9 @@
+1. Install packages from ../packages.
+2. To profile using perf:
+	2.1 make & install perf from ../tools/perf
+	2.2 https://www.kernel.org/doc/Documentation/sysctl/kernel.txt
+		disable restrictions on revealing kernel ptrs to users
+		echo 0 > /proc/sys/kernel/kptr_restrict
+	2.3 https://www.kernel.org/doc/Documentation/sysctl/kernel.txt
+		enable use of perf by unprivileged users
+		echo -1 > /proc/sys/kernel/perf_event_paranoid
