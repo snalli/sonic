@@ -1,0 +1,25 @@
+#!/bin/bash
+
+# for filebench
+sudo apt install bison
+sudo apt install flex
+sudo apt install automake
+
+# for kernel browsing
+sudo apt install vim
+sudo apt install cscope
+sudo apt install git
+sudo apt install libncurses5-dev libncursesw5-dev
+sudo apt install libssl-dev
+
+# for chopper
+sudo apt install cmake
+sudo apt install libmpich-dev libopenmpi-dev
+sudo apt install m4
+
+# for aqemu
+sudo apt install qt5-default
+sudo apt install libvncserver-dev
+
+# misc
+sudo apt install scons
