@@ -32,6 +32,7 @@
 
 #include <stdlib.h>
 #include <unistd.h>
+#include <sys/syscall.h>	/* For SYS_xxx definitions */
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/param.h>

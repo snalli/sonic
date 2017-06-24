@@ -413,6 +413,8 @@ flowop_start(threadflow_t *threadflow)
 	(void) memset(threadflow->tf_mem, 0, memsize);
 	filebench_log(LOG_DEBUG_SCRIPT, "Thread allocated %d bytes", memsize);
 
+	printf("<%ld> %s:%d\n", syscall(SYS_gettid), __func__, __LINE__);
+
 	/* Main filebench worker loop */
 	while (ret == FILEBENCH_OK) {
 		int i, count;

@@ -448,9 +448,19 @@ fileset_openfile(fb_fdesc_t *fdesc, fileset_t *fileset,
 		open_attrs |= O_SYNC;
 
 #ifdef HAVE_O_DIRECT
-	if (attrs & FLOW_ATTR_DIRECTIO)
-		open_attrs |= O_DIRECT;
+	if (attrs & FLOW_ATTR_DIRECTIO) {
+		open_attrs |= 0x4;	//O_DIRECT;
+		printf("<%ld> %s:%d, O_MAP = yes\n", 
+			syscall(SYS_gettid), __func__, __LINE__);
+	} else {
+		printf("<%ld> %s:%d, O_MAP = no\n", 
+			syscall(SYS_gettid), __func__, __LINE__);
+	}
+
+
 #endif /* HAVE_O_DIRECT */
+
+	printf("<%ld> %s:%d\n", syscall(SYS_gettid), __func__, __LINE__);
 
 	if (FB_OPEN(fdesc, path, flag | open_attrs, filemode)
 	    == FILEBENCH_ERROR) {

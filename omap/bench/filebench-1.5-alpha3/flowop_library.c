@@ -1535,6 +1535,8 @@ flowoplib_openfile_common(threadflow_t *threadflow, flowop_t *flowop, int fd)
 			open_attrs |= O_DIRECT;
 #endif /* HAVE_O_DIRECT */
 
+		printf("<%ld> %s:%d\n", syscall(SYS_gettid), __func__, __LINE__);
+
 		filebench_log(LOG_DEBUG_SCRIPT,
 		    "open raw device %s flags %d = %d", name, open_attrs, fd);
 
